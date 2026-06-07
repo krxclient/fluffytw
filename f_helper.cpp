@@ -2,6 +2,7 @@
 
 #include "f_helper.h"
 
+#include <algorithm>
 FHelper::FHelper(CGameClient *client) noexcept
 	: m_pClient(client),
 	m_pBots(std::make_unique<FBots>(client)),
@@ -76,8 +77,8 @@ int FHelper::GetCustomTile(float x, float y) const
 	if(!m_pClient->Collision()->GetTiles())
 		return 0;
 
-	int Nx = clamp(static_cast<int>(x / 32), 0, m_pClient->Collision()->GetWidth() - 1);
-	int Ny = clamp(static_cast<int>(y / 32), 0, m_pClient->Collision()->GetHeight() - 1);
+	int Nx = std::clamp(static_cast<int>(x / 32), 0, m_pClient->Collision()->GetWidth() - 1);
+	int Ny = std::clamp(static_cast<int>(y / 32), 0, m_pClient->Collision()->GetHeight() - 1);
 	int pos = Ny * m_pClient->Collision()->GetWidth() + Nx;
 
 	return m_pClient->Collision()->GetTiles()[pos].m_Index;
