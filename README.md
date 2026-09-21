@@ -30,20 +30,29 @@ It's the ultimate, pre-compiled version of our work, built for players who want 
 
 ---
 
-## Building it into DDNet 19.9 
-1. Put this folder at `ddnet-19.9/src/game/client/fluffytw`
-   (so that `src/game/client/fluffytw/f_helper.h` exists).
-2. Apply the DDNet-side changes below. Easiest is to just grab a DDNet 19.9
-   fork that already has them.
-
-You need the following changes on the DDNet side:
-
-- `src/game/collision.h`: add a getter
-  ```cpp
-  CTile *GetTiles() const { return m_pTiles; }
+  ## Installation to 19.9
+  
+  Before you start, make sure to clone the DDNet repository.
+  
+  ```bash
+  # do this inside DDNet main directory
+  cd src/game/client
+  git submodule add https://github.com/fluffysnaff/fluffytw.git
   ```
-- `src/engine/shared/config_variables.h`: add the config variables (also listed
-  in the table at the bottom):
+  
+  Add this to `CMakeLists.txt`:
+  ```cmake
+  add_subdirectory(src/game/client/fluffytw)
+  ```
+  
+  It should be placed before:
+  ```cmake
+  set(CLIENT_SRC ${ENGINE_CLIENT} ${PLATFORM_CLIENT} ${GAME_CLIENT} ${GAME_EDITOR} ${GAME_MAP} ${GAME_GENERATED_CLIENT})
+  ```
+  
+  ## Config
+  
+  Add this to `src/engine/shared/config_variables.h`:
   ```cpp
   MACRO_CONFIG_INT(FluffyAimbot, cl_fluffy_aimbot, 0, 0, 1, CFGFLAG_SAVE | CFGFLAG_CLIENT, "fluffytw: enable aimbot")
   MACRO_CONFIG_INT(FluffyAimbotFov, cl_fluffy_aimbot_fov, 360, 0, 360, CFGFLAG_SAVE | CFGFLAG_CLIENT, "fluffytw: aimbot field of view")
@@ -54,54 +63,68 @@ You need the following changes on the DDNet side:
   MACRO_CONFIG_INT(FluffyEsp, cl_fluffy_esp, 0, 0, 1, CFGFLAG_SAVE | CFGFLAG_CLIENT, "fluffytw: enable esp/visuals")
   MACRO_CONFIG_INT(FluffyEspFov, cl_fluffy_esp_fov, 0, 0, 1, CFGFLAG_SAVE | CFGFLAG_CLIENT, "fluffytw: draw aimbot fov")
   ```
-- root `CMakeLists.txt`: add the fluffytw files to `GAME_CLIENT` (inside the
-  `set_src(GAME_CLIENT GLOB_RECURSE ...)` block), in alphabetical order:
-  ```
-  fluffytw/aimbot/aimbot.cpp
-  fluffytw/aimbot/aimbot.h
-  fluffytw/aimbot/aimbot_scans.cpp
-  fluffytw/f_bots.cpp
-  fluffytw/f_bots.h
-  fluffytw/f_component.h
-  fluffytw/f_config.h
-  fluffytw/f_helper.cpp
-  fluffytw/f_helper.h
-  fluffytw/f_visuals.cpp
-  fluffytw/f_visuals.h
-  fluffytw/f_visuals-base.cpp
-  ```
-- `src/game/client/gameclient.cpp`:
+    
+  Inside `gameclient.cpp` add this:
   ```cpp
   #include <memory>
-  #include "game/client/fluffytw/f_helper.h"
-  ...
-  std::unique_ptr<FHelper> fHelper; // near the other globals
-  ...
-  // inside CGameClient::OnConsoleInit():
+  #include "fluffytw/f_helper.h"
+  std::unique_ptr<FHelper> fHelper;
+  ```
+  
+  Now add this code to `void CGameClient::OnConsoleInit()`:
+  ```cpp
+  void CGameClient::OnConsoleInit()
+  {
+  // ...
   fHelper = std::make_unique<FHelper>(this);
+  // ...
+  }
   ```
-- `src/game/client/components/controls.cpp`: include the header, then in
-  `SnapInput` (after the direction block) feed the config and run the bots:
-  ```cpp
-  #include "game/client/fluffytw/f_helper.h"
-  ...
-  fHelper->m_pConfig->aimbotCfg.enabled = g_Config.m_FluffyAimbot != 0;
-  fHelper->m_pConfig->aimbotCfg.fov = static_cast<float>(g_Config.m_FluffyAimbotFov);
-  fHelper->m_pConfig->aimbotCfg.silent = g_Config.m_FluffyAimbotSilent != 0;
-  fHelper->m_pConfig->aimbotCfg.hookVisible = g_Config.m_FluffyAimbotHookVisible != 0;
-  fHelper->m_pConfig->aimbotCfg.edge = g_Config.m_FluffyAimbotEdge != 0;
-  fHelper->m_pConfig->aimbotCfg.accuracy = static_cast<float>(g_Config.m_FluffyAimbotAccuracy);
-  fHelper->m_pBots->Run();
-  ```
-- `src/game/client/components/players.cpp`: include the header, then in
-  `RenderPlayer` (once `Position` is known) run the visuals:
-  ```cpp
-  #include "game/client/fluffytw/f_helper.h"
-  ...
-  fHelper->m_pConfig->espCfg.enabled = g_Config.m_FluffyEsp != 0;
-  fHelper->m_pConfig->espCfg.drawFov = g_Config.m_FluffyEspFov != 0;
-  fHelper->m_pVisuals->Run(ClientId, Angle, Position);
-  ```
+    
+  1. **Visuals**  
+     Inside `players.cpp` include:
+     ```cpp
+     #include "game/client/fluffytw/f_helper.h"
+     ```
+  
+     Then in `RenderPlayer()` add:
+     ```cpp
+     // ...
+     fHelper->m_pConfig->espCfg.enabled = g_Config.m_FluffyEsp != 0;
+     fHelper->m_pConfig->espCfg.drawFov = g_Config.m_FluffyEspFov != 0;
+     fHelper->m_pVisuals->Run(ClientId, Angle, Position);
+     ```
+  
+  2. **Helper**  
+     Add this in `CCollision` class:
+     ```cpp
+     // inside collision.h
+     public:
+        // ...
+        CTile *GetTiles() { return m_pTiles; }
+     ```
+  
+  3. **Bots**  
+     Inside `controls.cpp` include:
+     ```cpp
+     #include "game/client/fluffytw/f_helper.h"
+     ```
+     Then in `SnapInput()` add:
+     ```cpp
+     // ...
+     fHelper->m_pConfig->aimbotCfg.enabled = g_Config.m_FluffyAimbot != 0;
+     fHelper->m_pConfig->aimbotCfg.fov = static_cast<float>(g_Config.m_FluffyAimbotFov);
+     fHelper->m_pConfig->aimbotCfg.silent = g_Config.m_FluffyAimbotSilent != 0;
+     fHelper->m_pConfig->aimbotCfg.hookVisible = g_Config.m_FluffyAimbotHookVisible != 0;
+     fHelper->m_pConfig->aimbotCfg.edge = g_Config.m_FluffyAimbotEdge != 0;
+     fHelper->m_pConfig->aimbotCfg.accuracy = static_cast<float>(g_Config.m_FluffyAimbotAccuracy);
+     fHelper->m_pBots->Run();
+     ```
+     It should be placed after:
+     ```cpp
+     if(!m_aInputDirectionLeft[g_Config.m_ClDummy] && m_aInputDirectionRight[g_Config.m_ClDummy])
+     	m_aInputData[g_Config.m_ClDummy].m_Direction = 1;
+     ```
 
 ## Enabling
 ```
